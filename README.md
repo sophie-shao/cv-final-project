@@ -6,10 +6,14 @@ Objective: Create a filter that sharpens the foreground and blurs the background
 
     Code outline: 
 
-    Data collection:
-
   Pre-trained model choice: facenet
 
     Code outline:
 
-    Data collection:
+  Pre-trained model choice: MTCNN
+
+    Code outline:
+
+  Pre-trained model choice: VGG-Face
+
+    Code outline:
