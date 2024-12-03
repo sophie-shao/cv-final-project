@@ -31,8 +31,40 @@ Objective: Create a filter that sharpens the foreground and blurs the background
   Pre-trained model choice: MTCNN
 
     Code outline:
+    #MTCNN stands for Multi-Task Cascaded Convolutional Neural Networks. 
+#It is designed to detect faces and facial landmarks in an image and 
+#has a cascade structure with three neural networks. MTCNN works well 
+#in identifying faces in different angles and lighting. 
+    
+import cv2
+import numpy as np
+from mtcnn import MTCNN
 
-  Pre-trained model choice: VGG-Face
-    Restricted for commerical use :(
+#STEP 1: import images from the stereo camera image dataset and 
+#extract the bounding box for the face and facial landmarks using 
+#MTCNN
 
-    Code outline:
+#STEP 2: after detecting the face, we can crop the face region and 
+#enhance it using cv2 functions
+
+#STEP 3: blur the background of the image using a Gaussian blur from 
+#cv2
+
+#STEP 4: combine the two images of the enhanced face and blurred 
+#background, so that the enhanced face is placed back into the image. 
+#To blend the two images nicely, we can use cv2.addWeighted. 
+
+#initialize MTCNN
+detector = MTCNN()
+
+#load image
+img = cv2.imread("image_path.jpg")
+
+#detect faces
+faces = detector.detect_faces(img)
+
+#enhance subject and blur background
+x, y, w, h = face['box']
+landmarks = face['keypoints']
+
+#STEPS 3 and 4
