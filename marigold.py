@@ -14,7 +14,7 @@ def load_depth_model():
     print("Depth model loaded.")
     return model
 
-# Predict the depth map using the model
+# Predict the depth map usingthe model
 def predict_depth(model, image):
     depth = model(image)
     depth_map = depth.prediction[0]
@@ -24,6 +24,13 @@ def predict_depth(model, image):
 def preprocess_image(image_path):
     image = diffusers.utils.load_image(image_path)
     return image
+
+def enhance_subject(image, mask):
+    """Enhance the subject based on the binary mask"""
+    # We will apply enhancements like contrast, sharpness, etc., to the subject (foreground)
+    subject_image = cv2.bitwise_and(image, image, mask=mask)  # Extract the subject using the mask
+    enhanced_subject = cv2.convertScaleAbs(subject_image, alpha=1.2, beta=50)  # Example of contrast and brightness enhancement
+    return enhanced_subject
 
 # Apply portrait mode effect
 def apply_portrait_mode(image_path, output_path):
@@ -54,8 +61,10 @@ def apply_portrait_mode(image_path, output_path):
     # Step 7: Apply Gaussian blur to the background
     blurred_image = cv2.GaussianBlur(original_image, (15, 15), 0)
 
+    enhanced_image = enhance_subject(original_image, foreground_mask)
+
     # Step 8: Combine the sharp foreground with the blurred background
-    portrait_mode_image = np.where(foreground_mask_3d, original_image, blurred_image)
+    portrait_mode_image = np.where(foreground_mask_3d, enhanced_image, blurred_image)
 
     # Step 9: Save the resulting image
     cv2.imwrite(output_path, portrait_mode_image)
