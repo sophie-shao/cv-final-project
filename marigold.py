@@ -135,8 +135,23 @@ def apply_portrait_mode(image_path, output_path):
 
     print(f"Portrait mode image saved to {output_path}")
 
+'''
 # Example usage
-input_image_path = "images/IMG_8967.jpeg"  # Replace with the path to your input image
+input_image_path = "images/sophie.jpg"  # Replace with the path to your input image
 output_image_path = "portrait_mode_output.jpg"
 
 apply_portrait_mode(input_image_path, output_image_path)
+'''
+
+#taken from homework 5 to apply onto a folder of images
+# Get list of all images in marigold_dataset directory
+data_path = "marigold_dataset"
+file_list = []
+for root, _, files in os.walk(os.path.join(data_path)):
+    for name in files:
+        if name.endswith(".jpeg"):
+            file_list.append(os.path.join(root, name))
+
+for i in range(len(file_list)):
+    output_path = f"outputs/out_{i}.jpg"
+    apply_portrait_mode(file_list[i], output_path)
