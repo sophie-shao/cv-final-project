@@ -44,7 +44,7 @@ def compute_disparity(left_image, right_image, block_size=5, max_disparity=64):
 
     return disparity_map
 
-def create_portrait_mode(image1_file, image2_file, blur_intensity=15, block_size=5, max_disparity=64):
+def create_portrait_mode(image1_file, image2_file, blur_intensity=31, block_size=5, max_disparity=64):
     # Load and preprocess stereo images
     image1 = img_as_float32(io.imread(image1_file))
     image2 = img_as_float32(io.imread(image2_file))
