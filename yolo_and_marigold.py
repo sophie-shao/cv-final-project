@@ -5,7 +5,60 @@ import diffusers
 import torch
 import matplotlib.pyplot as plt
 
-# Load marigold depth estimation model
+# Load YOLO model
+def load_yolo_model():
+    net = cv2.dnn.readNet("yolov3.weights", "yolov3.cfg")  # Replace with actual YOLO model weights and config
+    layer_names = net.getLayerNames()
+    output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+    return net, output_layers
+
+# Load class labels (e.g., cat, person, food)
+def load_classes():
+    with open("coco.names", "r") as f:
+        classes = [line.strip() for line in f.readlines()]
+    return classes
+
+# Detect objects with YOLO
+def detect_objects(image, net, output_layers, classes):
+    height, width, channels = image.shape
+    blob = cv2.dnn.blobFromImage(image, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+    net.setInput(blob)
+    outputs = net.forward(output_layers)
+
+    class_ids = []
+    confidences = []
+    boxes = []
+    for out in outputs:
+        for detection in out:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+            if confidence > 0.5:
+                center_x = int(detection[0] * width)
+                center_y = int(detection[1] * height)
+                w = int(detection[2] * width)
+                h = int(detection[3] * height)
+                x = int(center_x - w / 2)
+                y = int(center_y - h / 2)
+                boxes.append([x, y, w, h])
+                confidences.append(float(confidence))
+                class_ids.append(class_id)
+
+    indices = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+    return boxes, confidences, class_ids, indices
+
+# Apply the mask and compute the average depth for detected objects
+def get_subject_depth(image, boxes, depth_map):
+    depths = []
+    for (x, y, w, h) in boxes:
+        # Extract the region corresponding to the detected object
+        object_region = depth_map[y:y + h, x:x + w]
+        # Compute the average depth of the object
+        avg_depth = np.mean(object_region)
+        depths.append(avg_depth)
+    return np.mean(depths)  # Return the average depth of the subject
+
+
 def load_depth_model():
     model = diffusers.MarigoldDepthPipeline.from_pretrained(
         "prs-eth/marigold-depth-lcm-v1-0", variant="fp16"
@@ -97,63 +150,42 @@ def smooth_mask(mask, blur_radius=15):
     smoothed_mask = np.clip(smoothed_mask, 0, 1)  # Ensure the mask stays between 0 and 1
     return smoothed_mask
 
-# Apply portrait mode effect
-def apply_portrait_mode(image_path, output_path):
-    # Step 1: Load the input image
-    original_image = cv2.imread(image_path)
-    if original_image is None:
-        raise FileNotFoundError(f"Image not found at path: {image_path}")
 
-    # Step 2: Load the depth estimation model
+
+def apply_portrait_mode_with_yolo(image_path, output_path):
+    # Step 1: Load the YOLO model
+    net, output_layers = load_yolo_model()
+    classes = load_classes()
+
+    # Step 2: Load the depth model (Marigold)
     depth_model = load_depth_model()
 
-    # Step 3: Preprocess the image for the model
+    # Step 3: Preprocess the image and perform object detection
+    original_image = cv2.imread(image_path)
     input_image = preprocess_image(image_path)
-
-    # Step 4: Predict the depth map
     depth_map = predict_depth(depth_model, input_image)
 
-    # Step 5: Resize depth map to match original image dimensions
-    depth_map_resized = cv2.resize(depth_map, (original_image.shape[1], original_image.shape[0]))
+    # Step 4: Detect objects (person, cat, food, etc.) with YOLO
+    boxes, confidences, class_ids, indices = detect_objects(original_image, net, output_layers, classes)
 
-    # Visualize the depth map (optional)
-    visualize_depth_map(depth_map_resized)
+    # Step 5: Get the average depth of the subject (person, cat, etc.)
+    subject_depth = get_subject_depth(original_image, boxes, depth_map)
+    print(f"Average subject depth: {subject_depth}")
 
-    # Step 6: Threshold to create a binary foreground mask
-    threshold = calculate_threshold(depth_map, percentile=60)
+    # Step 6: Create a refined foreground mask based on dynamic thresholding
+    threshold = subject_depth  # Dynamic threshold based on subject's depth
     foreground_mask = generate_foreground_mask(depth_map, threshold)
     refined_mask = refine_mask(foreground_mask)
 
-    # Debugging: Visualize the mask (optional)
-    visualize_mask(refined_mask, "Refined Foreground Mask")
-
-    # Step 8: Combine sharp foreground and blurred background
+    # Step 7: Combine the sharp foreground and blurred background
     portrait_image = combine_foreground_background(original_image, refined_mask)
 
-    # Step 11: Save the resulting image
+    # Step 8: Save the resulting image
     cv2.imwrite(output_path, portrait_image)
-
     print(f"Portrait mode image saved to {output_path}")
 
-'''
 # Example usage
-input_image_path = "images/IMG_8966.jpeg"  # Replace with the path to your input image
+input_image_path = "images/your_image.jpeg"  # Replace with your image path
 output_image_path = "portrait_mode_output.jpg"
 
-apply_portrait_mode(input_image_path, output_image_path)
-'''
-
-'''
-#taken from homework 5 to apply onto a folder of images
-# Get list of all images in marigold_dataset directory
-data_path = "marigold_dataset"
-file_list = []
-for root, _, files in os.walk(os.path.join(data_path)):
-    for name in files:
-        if name.endswith(".jpeg"):
-            file_list.append(os.path.join(root, name))
-
-for i in range(len(file_list)):
-    output_path = f"outputs/out_{file_list[i]}"
-    apply_portrait_mode(file_list[i], output_path)
-'''
+apply_portrait_mode_with_yolo(input_image_path, output_image_path)
