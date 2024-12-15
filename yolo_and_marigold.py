@@ -185,7 +185,7 @@ def apply_portrait_mode_with_yolo(image_path, output_path):
     print(f"Portrait mode image saved to {output_path}")
 
 # Example usage
-input_image_path = "images/your_image.jpeg"  # Replace with your image path
+input_image_path = "images/sophie.jpg"  # Replace with your image path
 output_image_path = "portrait_mode_output.jpg"
 
 apply_portrait_mode_with_yolo(input_image_path, output_image_path)
