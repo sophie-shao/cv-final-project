@@ -52,7 +52,7 @@ def create_portrait_mode(image1_file, image2_file, blur_intensity=45, block_size
     image2 = rgb2gray(image2)
 
     # Scale images for faster computation
-    scale_factor = 0.25
+    scale_factor = 0.2
     image1 = cv2.resize(image1, (0, 0), fx=scale_factor, fy=scale_factor)
     image2 = cv2.resize(image2, (0, 0), fx=scale_factor, fy=scale_factor)
 
@@ -92,8 +92,8 @@ def create_portrait_mode(image1_file, image2_file, blur_intensity=45, block_size
 
 def main():
     # Replace these with the actual file paths to your stereo images
-    left_image_path = 'images/rik0.jpg'
-    right_image_path = 'images/rik1.jpg'
+    left_image_path = 'images/eye2eye1.jpg'
+    right_image_path = 'images/eye2eye2.jpg'
     
     create_portrait_mode(left_image_path, right_image_path)
 
