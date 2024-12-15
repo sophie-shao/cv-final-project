@@ -5,7 +5,7 @@ import diffusers
 import torch
 import matplotlib.pyplot as plt
 
-# Load the Marigold depth estimation model
+# Load marigold depth estimation model
 def load_depth_model():
     model = diffusers.MarigoldDepthPipeline.from_pretrained(
         "prs-eth/marigold-depth-lcm-v1-0", variant="fp16"
@@ -13,13 +13,14 @@ def load_depth_model():
     print("Depth model loaded.")
     return model
 
+
 # Predict the depth map using the model
 def predict_depth(model, image):
     depth = model(image)
     depth_map = depth.prediction[0]  # Directly use the NumPy array output
     return depth_map
 
-# Preprocess the input image (resize and normalize as needed by the model)
+# Preprocess the input image?
 def preprocess_image(image_path):
     image = diffusers.utils.load_image(image_path)
     return image
@@ -90,6 +91,12 @@ def visualize_depth_map(depth_map, output_path="depth_map_visualization.png"):
     plt.close()
     print(f"Depth map visualization saved to {output_path}")
 
+def smooth_mask(mask, blur_radius=15):
+    # Apply Gaussian Blur to mask to smooth transition
+    smoothed_mask = cv2.GaussianBlur(mask.astype(np.float32), (blur_radius, blur_radius), 0)
+    smoothed_mask = np.clip(smoothed_mask, 0, 1)  # Ensure the mask stays between 0 and 1
+    return smoothed_mask
+
 # Apply portrait mode effect
 def apply_portrait_mode(image_path, output_path):
     # Step 1: Load the input image
@@ -125,6 +132,7 @@ def apply_portrait_mode(image_path, output_path):
 
     # Step 11: Save the resulting image
     cv2.imwrite(output_path, portrait_image)
+
     print(f"Portrait mode image saved to {output_path}")
 
 # Example usage
