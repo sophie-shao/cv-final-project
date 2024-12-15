@@ -67,7 +67,7 @@ def combine_foreground_background(image, mask):
     
     # Extract the sharp foreground and blurred background
     foreground = sharpened_foreground.astype(np.float32)
-    blurred_background = cv2.GaussianBlur(image, (65, 65), 0).astype(np.float32)
+    blurred_background = cv2.GaussianBlur(image, (151, 151), 0).astype(np.float32)
     
     # Perform alpha blending: Combine foreground and background smoothly
     combined_image = (foreground * alpha[..., None] + blurred_background * (1 - alpha[..., None])).astype(np.uint8)
@@ -140,3 +140,17 @@ input_image_path = "images/IMG_8966.jpeg"  # Replace with the path to your input
 output_image_path = "portrait_mode_output.jpg"
 
 apply_portrait_mode(input_image_path, output_image_path)
+
+
+# #taken from homework 5 to apply onto a folder of images
+# # Get list of all images in marigold_dataset directory
+# data_path = "marigold_dataset"
+# file_list = []
+# for root, _, files in os.walk(os.path.join(data_path)):
+#     for name in files:
+#         if name.endswith(".jpeg"):
+#             file_list.append(os.path.join(root, name))
+
+# for i in range(len(file_list)):
+#     output_path = f"outputs/out_{i}.jpg"
+#     apply_portrait_mode(file_list[i], output_path)
