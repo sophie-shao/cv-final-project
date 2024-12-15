@@ -92,8 +92,8 @@ def create_portrait_mode(image1_file, image2_file, blur_intensity=45, block_size
 
 def main():
     # Replace these with the actual file paths to your stereo images
-    left_image_path = 'images/IMG_8966.jpeg'
-    right_image_path = 'images/IMG_8967.jpeg'
+    left_image_path = 'images/rik0.jpg'
+    right_image_path = 'images/rik1.jpg'
     
     create_portrait_mode(left_image_path, right_image_path)
 
