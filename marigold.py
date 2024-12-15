@@ -152,5 +152,5 @@ apply_portrait_mode(input_image_path, output_image_path)
 #             file_list.append(os.path.join(root, name))
 
 # for i in range(len(file_list)):
-#     output_path = f"outputs/out_{i}.jpg"
+#     output_path = f"outputs/out_{file_list[i]}"
 #     apply_portrait_mode(file_list[i], output_path)
