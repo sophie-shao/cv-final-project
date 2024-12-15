@@ -67,7 +67,7 @@ def combine_foreground_background(image, mask):
     
     # Extract the sharp foreground and blurred background
     foreground = sharpened_foreground.astype(np.float32)
-    blurred_background = cv2.GaussianBlur(image, (65, 65), 0).astype(np.float32)
+    blurred_background = cv2.GaussianBlur(image, (151, 151), 0).astype(np.float32)
     
     # Perform alpha blending: Combine foreground and background smoothly
     combined_image = (foreground * alpha[..., None] + blurred_background * (1 - alpha[..., None])).astype(np.uint8)
@@ -136,7 +136,7 @@ def apply_portrait_mode(image_path, output_path):
     print(f"Portrait mode image saved to {output_path}")
 
 # Example usage
-input_image_path = "images/IMG_8966.jpeg"  # Replace with the path to your input image
+input_image_path = "images/IMG_8967.jpeg"  # Replace with the path to your input image
 output_image_path = "portrait_mode_output.jpg"
 
 apply_portrait_mode(input_image_path, output_image_path)
