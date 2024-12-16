@@ -133,48 +133,49 @@ def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_o
 
     print(f"Saved: Depth Map -> {depth_output_path},\nMask -> {mask_output_path},\nPortrait -> {output_image_path}")
 
+apply_portrait_mode("images/png_stereo_2.png", "output.png", "depth.png", "mask.png")
 
-# Process an entire folder of images
-def process_image_folder(input_folder, output_folder):
-    # Ensure output folder exists
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-        print(f"Created output folder: {output_folder}")
+# # Process an entire folder of images
+# def process_image_folder(input_folder, output_folder):
+#     # Ensure output folder exists
+#     if not os.path.exists(output_folder):
+#         os.makedirs(output_folder)
+#         print(f"Created output folder: {output_folder}")
 
-    # Get all image paths in the input folder
-    image_files = [f for f in os.listdir(input_folder) if f.endswith(('.jpeg', '.jpg', '.png'))]
+#     # Get all image paths in the input folder
+#     image_files = [f for f in os.listdir(input_folder) if f.endswith(('.jpeg', '.jpg', '.png'))]
 
-    print(f"Found {len(image_files)} images in {input_folder}. Processing...")
+#     print(f"Found {len(image_files)} images in {input_folder}. Processing...")
 
-    # Loop through each image
-    for i, image_file in enumerate(image_files):
-        input_image_path = os.path.join(input_folder, image_file)
+#     # Loop through each image
+#     for i, image_file in enumerate(image_files):
+#         input_image_path = os.path.join(input_folder, image_file)
 
-        # Create output subfolder for each image group
-        image_output_folder = os.path.join(output_folder, f"output_{i+1}")
-        if not os.path.exists(image_output_folder):
-            os.makedirs(image_output_folder)
+#         # Create output subfolder for each image group
+#         image_output_folder = os.path.join(output_folder, f"output_{i+1}")
+#         if not os.path.exists(image_output_folder):
+#             os.makedirs(image_output_folder)
 
-        # Define output paths for depth map, mask, and portrait image
-        depth_output_path = os.path.join(image_output_folder, f"{i+1}_depth_map.png")
-        mask_output_path = os.path.join(image_output_folder, f"{i+1}_mask.png")
-        portrait_output_path = os.path.join(image_output_folder, f"{i+1}_portrait.png")
+#         # Define output paths for depth map, mask, and portrait image
+#         depth_output_path = os.path.join(image_output_folder, f"{i+1}_depth_map.png")
+#         mask_output_path = os.path.join(image_output_folder, f"{i+1}_mask.png")
+#         portrait_output_path = os.path.join(image_output_folder, f"{i+1}_portrait.png")
 
-        try:
-            print(f"Processing image {i+1}/{len(image_files)}: {image_file}")
+#         try:
+#             print(f"Processing image {i+1}/{len(image_files)}: {image_file}")
             
-            # Call the apply_portrait_mode function with all paths
-            apply_portrait_mode(input_image_path, portrait_output_path, depth_output_path, mask_output_path)
+#             # Call the apply_portrait_mode function with all paths
+#             apply_portrait_mode(input_image_path, portrait_output_path, depth_output_path, mask_output_path)
 
-            print(f"Saved outputs for {image_file} to {image_output_folder}")
-        except Exception as e:
-            print(f"Error processing {image_file}: {e}")
+#             print(f"Saved outputs for {image_file} to {image_output_folder}")
+#         except Exception as e:
+#             print(f"Error processing {image_file}: {e}")
 
-# Example usage
-input_folder = "marigold_dataset"  # Replace with your input folder path
-output_folder = "marigold_outputs"  # Replace with your output folder path
+# # Example usage
+# input_folder = "marigold_dataset"  # Replace with your input folder path
+# output_folder = "marigold_outputs"  # Replace with your output folder path
 
-process_image_folder(input_folder, output_folder)
+# process_image_folder(input_folder, output_folder)
 
 '''
 #taken from homework 5 to apply onto a folder of images
