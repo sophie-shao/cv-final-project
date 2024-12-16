@@ -4,6 +4,7 @@ from PIL import Image
 import diffusers
 import torch
 import matplotlib.pyplot as plt
+import os
 
 # Load marigold depth estimation model
 def load_depth_model():
@@ -75,11 +76,13 @@ def combine_foreground_background(image, mask):
     return combined_image
 
 # Visualize a mask for debugging
-def visualize_mask(mask, title="Mask Visualization"):
+def visualize_mask(mask, output_path="mask_visualization.png"):
     plt.imshow(mask, cmap="gray")
-    plt.title(title)
+    plt.title("Mask Visualization")
     plt.axis("off")
-    plt.show()
+    plt.savefig(output_path)
+    plt.close()
+    print(f"Mask visualization saved to {output_path}")
 
 # Visualize the depth map for debugging or visualization purposes
 def visualize_depth_map(depth_map, output_path="depth_map_visualization.png"):
@@ -91,14 +94,9 @@ def visualize_depth_map(depth_map, output_path="depth_map_visualization.png"):
     plt.close()
     print(f"Depth map visualization saved to {output_path}")
 
-def smooth_mask(mask, blur_radius=15):
-    # Apply Gaussian Blur to mask to smooth transition
-    smoothed_mask = cv2.GaussianBlur(mask.astype(np.float32), (blur_radius, blur_radius), 0)
-    smoothed_mask = np.clip(smoothed_mask, 0, 1)  # Ensure the mask stays between 0 and 1
-    return smoothed_mask
-
 # Apply portrait mode effect
-def apply_portrait_mode(image_path, output_path):
+def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_output_path):
+
     # Step 1: Load the input image
     original_image = cv2.imread(image_path)
     if original_image is None:
@@ -116,32 +114,67 @@ def apply_portrait_mode(image_path, output_path):
     # Step 5: Resize depth map to match original image dimensions
     depth_map_resized = cv2.resize(depth_map, (original_image.shape[1], original_image.shape[0]))
 
-    # Visualize the depth map (optional)
-    visualize_depth_map(depth_map_resized)
+    # Step 6: Save the depth map visualization
+    visualize_depth_map(depth_map_resized, depth_output_path)
 
-    # Step 6: Threshold to create a binary foreground mask
+    # Step 7: Threshold to create a binary foreground mask
     threshold = calculate_threshold(depth_map, percentile=60)
     foreground_mask = generate_foreground_mask(depth_map, threshold)
     refined_mask = refine_mask(foreground_mask)
 
-    # Debugging: Visualize the mask (optional)
-    visualize_mask(refined_mask, "Refined Foreground Mask")
+    # Step 8: Save the mask visualization
+    visualize_mask(refined_mask, mask_output_path)
 
-    # Step 8: Combine sharp foreground and blurred background
+    # Step 9: Combine sharp foreground and blurred background
     portrait_image = combine_foreground_background(original_image, refined_mask)
 
-    # Step 11: Save the resulting image
-    cv2.imwrite(output_path, portrait_image)
+    # Step 10: Save the resulting image
+    cv2.imwrite(output_image_path, portrait_image)
 
-    print(f"Portrait mode image saved to {output_path}")
+    print(f"Saved: Depth Map -> {depth_output_path},\nMask -> {mask_output_path},\nPortrait -> {output_image_path}")
 
-'''
+
+# Process an entire folder of images
+def process_image_folder(input_folder, output_folder):
+    # Ensure output folder exists
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+        print(f"Created output folder: {output_folder}")
+
+    # Get all image paths in the input folder
+    image_files = [f for f in os.listdir(input_folder) if f.endswith(('.jpeg', '.jpg', '.png'))]
+
+    print(f"Found {len(image_files)} images in {input_folder}. Processing...")
+
+    # Loop through each image
+    for i, image_file in enumerate(image_files):
+        input_image_path = os.path.join(input_folder, image_file)
+
+        # Create output subfolder for each image group
+        image_output_folder = os.path.join(output_folder, f"output_{i+1}")
+        if not os.path.exists(image_output_folder):
+            os.makedirs(image_output_folder)
+
+        # Define output paths for depth map, mask, and portrait image
+        depth_output_path = os.path.join(image_output_folder, f"{i+1}_depth_map.png")
+        mask_output_path = os.path.join(image_output_folder, f"{i+1}_mask.png")
+        portrait_output_path = os.path.join(image_output_folder, f"{i+1}_portrait.png")
+
+        try:
+            print(f"Processing image {i+1}/{len(image_files)}: {image_file}")
+            
+            # Call the apply_portrait_mode function with all paths
+            apply_portrait_mode(input_image_path, portrait_output_path, depth_output_path, mask_output_path)
+
+            print(f"Saved outputs for {image_file} to {image_output_folder}")
+        except Exception as e:
+            print(f"Error processing {image_file}: {e}")
+
 # Example usage
-input_image_path = "images/IMG_8966.jpeg"  # Replace with the path to your input image
-output_image_path = "portrait_mode_output.jpg"
+input_folder = "marigold_dataset"  # Replace with your input folder path
+output_folder = "marigold_outputs"  # Replace with your output folder path
 
-apply_portrait_mode(input_image_path, output_image_path)
-'''
+process_image_folder(input_folder, output_folder)
 
 '''
 #taken from homework 5 to apply onto a folder of images
