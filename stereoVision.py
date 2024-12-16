@@ -45,15 +45,18 @@ def compute_disparity(left_image, right_image, block_size=5, max_disparity=64):
 
     return disparity_map
 
-def create_portrait_mode(image1, image2, blur_intensity=31, block_size=5, max_disparity=64):
+def create_portrait_mode(image1, image2, blur_intensity=31, block_size=5, max_disparity=64, precomputed=False, disparity_map=None):
 
     # Scale images for faster computation
-    scale_factor = 0.25
+    scale_factor = 0.5
     image1 = cv2.resize(image1, (0, 0), fx=scale_factor, fy=scale_factor)
     image2 = cv2.resize(image2, (0, 0), fx=scale_factor, fy=scale_factor)
 
     # Compute disparity map
-    disparity = compute_disparity(image1, image2, block_size=block_size, max_disparity=max_disparity)
+    if precomputed:
+        disparity = load_image(disparity_map)
+    else:
+        disparity = compute_disparity(image1, image2, block_size=block_size, max_disparity=max_disparity)
 
     # Normalize disparity for visualization and processing
     disparity_normalized = cv2.normalize(disparity, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
@@ -126,13 +129,16 @@ def load_image(image_file):
 def main():
     # Replace these with the actual file paths to your stereo images
     #left_image_path = 'images/png_stereo_1.png'
-    left_image_path = 'images/robot_left.png'
+    #left_image_path = 'images/robot_left.png'
+    left_image_path = 'images/view1.png'
     #right_image_path = 'images/png_stereo_2.png'
-    right_image_path = 'images/robot_right.png'
+    #right_image_path = 'images/robot_right.png'
+    right_image_path = 'images/view5.png'
+    disp_map = 'images/disp1.png'
     image1 = load_image(left_image_path)
     image2 = load_image(right_image_path)
     
-    create_portrait_mode(image1, image2)
+    create_portrait_mode(image1, image2, precomputed=True, disparity_map=disp_map)
 
 if __name__ == "__main__":
     main()
