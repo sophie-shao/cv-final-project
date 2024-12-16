@@ -63,9 +63,9 @@ def add_cat_filter(image_path, ear_path, heart_path, output_path):
     print(f"Output saved to {output_path}")
 
 # Paths
-image_path = "images/IMG_8967.jpeg"  # Input image
-ear_path = "images/ears.png"    # Path to cat ears PNG
-heart_path = "images/hearts.png"   # Path to hearts PNG
+image_path = "filter_images/IMG_8967.jpeg"  # Input image
+ear_path = "filter_images/ears.png"    # Path to cat ears PNG
+heart_path = "filter_images/hearts.png"   # Path to hearts PNG
 output_path = "cat_filter_output.png"    # Output image
 
 # Run the function

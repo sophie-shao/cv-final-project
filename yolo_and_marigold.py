@@ -4,89 +4,43 @@ from PIL import Image
 import diffusers
 import torch
 import matplotlib.pyplot as plt
+import os
 
-# Load YOLO model
+# Load YOLOv5 for object detection
 def load_yolo_model():
-    net = cv2.dnn.readNet("yolov3.weights", "yolov3.cfg")  # Replace with actual YOLO model weights and config
-    layer_names = net.getLayerNames()
-    output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
-    return net, output_layers
+    model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
+    print("YOLOv5 model loaded.")
+    return model
 
-# Load class labels (e.g., cat, person, food)
-def load_classes():
-    with open("coco.names", "r") as f:
-        classes = [line.strip() for line in f.readlines()]
-    return classes
-
-# Detect objects with YOLO
-def detect_objects(image, net, output_layers, classes):
-    height, width, channels = image.shape
-    blob = cv2.dnn.blobFromImage(image, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
-    net.setInput(blob)
-    outputs = net.forward(output_layers)
-
-    class_ids = []
-    confidences = []
-    boxes = []
-    for out in outputs:
-        for detection in out:
-            scores = detection[5:]
-            class_id = np.argmax(scores)
-            confidence = scores[class_id]
-            if confidence > 0.5:
-                center_x = int(detection[0] * width)
-                center_y = int(detection[1] * height)
-                w = int(detection[2] * width)
-                h = int(detection[3] * height)
-                x = int(center_x - w / 2)
-                y = int(center_y - h / 2)
-                boxes.append([x, y, w, h])
-                confidences.append(float(confidence))
-                class_ids.append(class_id)
-
-    indices = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
-    return boxes, confidences, class_ids, indices
-
-# Apply the mask and compute the average depth for detected objects
-def get_subject_depth(image, boxes, depth_map):
-    depths = []
-    for (x, y, w, h) in boxes:
-        # Extract the region corresponding to the detected object
-        object_region = depth_map[y:y + h, x:x + w]
-        # Compute the average depth of the object
-        avg_depth = np.mean(object_region)
-        depths.append(avg_depth)
-    return np.mean(depths)  # Return the average depth of the subject
-
-
+# Load Marigold depth estimation model
 def load_depth_model():
     model = diffusers.MarigoldDepthPipeline.from_pretrained(
         "prs-eth/marigold-depth-lcm-v1-0", variant="fp16"
     ).to("cpu")
-    print("Depth model loaded.")
+    print("Marigold depth model loaded.")
     return model
 
-
-# Predict the depth map using the model
+# Predict depth map using Marigold model
 def predict_depth(model, image):
     depth = model(image)
-    depth_map = depth.prediction[0]  # Directly use the NumPy array output
+    depth_map = depth.prediction[0]
     return depth_map
 
-# Preprocess the input image?
+# Preprocess input image for Marigold
 def preprocess_image(image_path):
     image = diffusers.utils.load_image(image_path)
     return image
 
-# Calculate the threshold for separating foreground and background
-def calculate_threshold(depth_map, percentile=60):
-    threshold = np.percentile(depth_map, percentile)
-    print(f"Dynamic threshold (percentile {percentile}): {threshold:.3f}")
-    return threshold
+# Calculate average depth in the YOLO-detected bounding box
+def calculate_average_depth(depth_map, bbox):
+    x1, y1, x2, y2 = bbox
+    cropped_region = depth_map[y1:y2, x1:x2]
+    avg_depth = np.mean(cropped_region)
+    print(f"Average depth in bounding box: {avg_depth:.3f}")
+    return avg_depth
 
-# Generate a binary mask separating foreground and background
+# Generate binary mask separating foreground and background
 def generate_foreground_mask(depth_map, threshold):
-    # Foreground: depth values < threshold
     mask = (depth_map < threshold).astype(np.uint8) * 255
     return mask
 
@@ -101,38 +55,29 @@ def refine_mask(mask):
     
     return refined_mask
 
-# Combine the blurred background and the sharp foreground
+# Combine sharpened foreground and blurred background
 def combine_foreground_background(image, mask):
-    """
-    Combine the sharp foreground and blurred background with a smooth transition.
-    """
-    # Feather the mask to create a smooth transition
-    blurred_mask = cv2.GaussianBlur(mask, (21, 21), 0)  # Feathering the mask edges
-    
-    # Normalize the blurred mask to range [0, 1] for alpha blending
+    blurred_mask = cv2.GaussianBlur(mask, (21, 21), 0)
     alpha = blurred_mask.astype(np.float32) / 255.0
     
-    # Sharpen the foreground
-    sharpening_kernel = np.array([[0, -1,  0],
-                                  [-1, 5, -1],
-                                  [0, -1,  0]])
-    sharpened_foreground = cv2.filter2D(image, -1, sharpening_kernel)
+    sharpening_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+    sharp_foreground = cv2.filter2D(image, -1, sharpening_kernel)
+    blurred_background = cv2.GaussianBlur(image, (51, 51), 0)
     
-    # Extract the sharp foreground and blurred background
-    foreground = sharpened_foreground.astype(np.float32)
-    blurred_background = cv2.GaussianBlur(image, (151, 151), 0).astype(np.float32)
+    foreground = sharp_foreground.astype(np.float32)
+    background = blurred_background.astype(np.float32)
+    combined = (foreground * alpha[..., None] + background * (1 - alpha[..., None])).astype(np.uint8)
     
-    # Perform alpha blending: Combine foreground and background smoothly
-    combined_image = (foreground * alpha[..., None] + blurred_background * (1 - alpha[..., None])).astype(np.uint8)
-    
-    return combined_image
+    return combined
 
 # Visualize a mask for debugging
-def visualize_mask(mask, title="Mask Visualization"):
+def visualize_mask(mask, output_path="mask_visualization.png"):
     plt.imshow(mask, cmap="gray")
-    plt.title(title)
+    plt.title("Mask Visualization")
     plt.axis("off")
-    plt.show()
+    plt.savefig(output_path)
+    plt.close()
+    print(f"Mask visualization saved to {output_path}")
 
 # Visualize the depth map for debugging or visualization purposes
 def visualize_depth_map(depth_map, output_path="depth_map_visualization.png"):
@@ -144,48 +89,112 @@ def visualize_depth_map(depth_map, output_path="depth_map_visualization.png"):
     plt.close()
     print(f"Depth map visualization saved to {output_path}")
 
-def smooth_mask(mask, blur_radius=15):
-    # Apply Gaussian Blur to mask to smooth transition
-    smoothed_mask = cv2.GaussianBlur(mask.astype(np.float32), (blur_radius, blur_radius), 0)
-    smoothed_mask = np.clip(smoothed_mask, 0, 1)  # Ensure the mask stays between 0 and 1
-    return smoothed_mask
+def draw_green_box(image_path, bbox, output_path):
+    """
+    Draws a green bounding box on the image and saves the result.
+    Args:
+        image_path (str): Path to the input image.
+        bbox (tuple): Bounding box coordinates (x1, y1, x2, y2).
+        output_path (str): Path to save the output image.
+    """
+    # Load the original image
+    image = cv2.imread(image_path)
+    if image is None:
+        raise FileNotFoundError(f"Image not found at path: {image_path}")
+
+    # Extract bounding box coordinates
+    x1, y1, x2, y2 = bbox
+
+    # Draw the green box (BGR: (0, 255, 0))
+    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)  # Thickness = 3
+
+    # Save the image with the green box
+    cv2.imwrite(output_path, image)
+    print(f"Green box image saved to {output_path}")
 
 
+# Main function to apply combined YOLO and Marigold processing
+def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_output_path, box_output_path):
 
-def apply_portrait_mode_with_yolo(image_path, output_path):
-    # Step 1: Load the YOLO model
-    net, output_layers = load_yolo_model()
-    classes = load_classes()
-
-    # Step 2: Load the depth model (Marigold)
+    # Load models
+    yolo_model = load_yolo_model()
     depth_model = load_depth_model()
 
-    # Step 3: Preprocess the image and perform object detection
+    # Load and preprocess the image
     original_image = cv2.imread(image_path)
     input_image = preprocess_image(image_path)
+
+    # Predict depth map
     depth_map = predict_depth(depth_model, input_image)
+    depth_map_resized = cv2.resize(depth_map, (original_image.shape[1], original_image.shape[0]))
+    visualize_depth_map(depth_map_resized, depth_output_path)
 
-    # Step 4: Detect objects (person, cat, food, etc.) with YOLO
-    boxes, confidences, class_ids, indices = detect_objects(original_image, net, output_layers, classes)
+    # Use YOLO to detect person
+    results = yolo_model(image_path)
+    detections = results.pandas().xyxy[0]
+    for _, row in detections.iterrows():
+        x1, y1, x2, y2 = int(row['xmin']), int(row['ymin']), int(row['xmax']), int(row['ymax'])
+        print(f"Object detected at: {x1}, {y1}, {x2}, {y2}")
 
-    # Step 5: Get the average depth of the subject (person, cat, etc.)
-    subject_depth = get_subject_depth(original_image, boxes, depth_map)
-    print(f"Average subject depth: {subject_depth}")
+        # Draw green box and save the result
+        draw_green_box(image_path, (x1, y1, x2, y2), box_output_path)
+        
+        # Calculate average depth in bounding box
+        avg_depth = calculate_average_depth(depth_map_resized, (x1, y1, x2, y2))
+        
+        # Generate mask using average depth
+        foreground_mask = generate_foreground_mask(depth_map_resized, avg_depth)
+        refined_mask = refine_mask(foreground_mask)
 
-    # Step 6: Create a refined foreground mask based on dynamic thresholding
-    threshold = subject_depth  # Dynamic threshold based on subject's depth
-    foreground_mask = generate_foreground_mask(depth_map, threshold)
-    refined_mask = refine_mask(foreground_mask)
+        # Debugging: Visualize the mask (optional)
+        visualize_mask(refined_mask, mask_output_path)
 
-    # Step 7: Combine the sharp foreground and blurred background
-    portrait_image = combine_foreground_background(original_image, refined_mask)
+        # Combine sharp foreground and blurred background
+        combined_image = combine_foreground_background(original_image, refined_mask)
+        cv2.imwrite(output_image_path, combined_image)
+        print(f"Saved: Depth Map -> {depth_output_path},\nMask -> {mask_output_path},\nGreen Box -> {box_output_path},\nPortrait -> {output_image_path}")
 
-    # Step 8: Save the resulting image
-    cv2.imwrite(output_path, portrait_image)
-    print(f"Portrait mode image saved to {output_path}")
+# Process an entire folder of images
+def process_image_folder(input_folder, output_folder):
+    # Ensure output folder exists
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+        print(f"Created output folder: {output_folder}")
+
+    # Get all image paths in the input folder
+    image_files = [f for f in os.listdir(input_folder) if f.endswith(('.jpeg', '.jpg', '.png'))]
+
+    print(f"Found {len(image_files)} images in {input_folder}. Processing...")
+
+    # Loop through each image
+    for i, image_file in enumerate(image_files):
+        input_image_path = os.path.join(input_folder, image_file)
+
+        # Create output subfolder for each image group
+        image_output_folder = os.path.join(output_folder, f"output_{i+1}")
+        if not os.path.exists(image_output_folder):
+            os.makedirs(image_output_folder)
+
+        # Define output paths for depth map, mask, and portrait image
+        depth_output_path = os.path.join(image_output_folder, f"{i+1}_depth_map.png")
+        mask_output_path = os.path.join(image_output_folder, f"{i+1}_mask.png")
+        portrait_output_path = os.path.join(image_output_folder, f"{i+1}_portrait.png")
+        box_output_path = os.path.join(image_output_folder, f"{i+1}_box.png")
+
+        try:
+            print(f"Processing image {i+1}/{len(image_files)}: {image_file}")
+            
+            # Call the apply_portrait_mode function with all paths
+            apply_portrait_mode(input_image_path, portrait_output_path, depth_output_path, mask_output_path, box_output_path)
+
+            print(f"Saved outputs for {image_file} to {image_output_folder}")
+        except Exception as e:
+            print(f"Error processing {image_file}: {e}")
 
 # Example usage
-input_image_path = "images/sophie.jpg"  # Replace with your image path
-output_image_path = "portrait_mode_output.jpg"
+input_folder = "marigold_dataset"  # Replace with your input folder path
+output_folder = "yolo_outputs"  # Replace with your output folder path
 
-apply_portrait_mode_with_yolo(input_image_path, output_image_path)
+process_image_folder(input_folder, output_folder)
+
+
