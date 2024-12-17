@@ -45,28 +45,31 @@ def compute_disparity(left_image, right_image, block_size=5, max_disparity=64):
 
     return disparity_map
 
-def create_portrait_mode(image1, image2, blur_intensity=31, block_size=5, max_disparity=64, precomputed=False, disparity_map=None):
+def create_portrait_mode(image1_file, image2_file, blur_intensity=71, block_size=10, max_disparity=60):
+    # Load and preprocess stereo images
+    image1 = img_as_float32(io.imread(image1_file))
+    image2 = img_as_float32(io.imread(image2_file))
+
+    # Convert to grayscale for disparity computation
+    image1_gray = rgb2gray(image1)
+    image2_gray = rgb2gray(image2)
 
     # Scale images for faster computation
-    scale_factor = 0.5
-    image1 = cv2.resize(image1, (0, 0), fx=scale_factor, fy=scale_factor)
-    image2 = cv2.resize(image2, (0, 0), fx=scale_factor, fy=scale_factor)
+    scale_factor = 0.2
+    image1_gray = cv2.resize(image1_gray, (0, 0), fx=scale_factor, fy=scale_factor)
+    image2_gray = cv2.resize(image2_gray, (0, 0), fx=scale_factor, fy=scale_factor)
 
     # Compute disparity map
-    if precomputed:
-        disparity = load_image(disparity_map)
-    else:
-        disparity = compute_disparity(image1, image2, block_size=block_size, max_disparity=max_disparity)
+    disparity = compute_disparity(image1_gray, image2_gray, block_size=block_size, max_disparity=max_disparity)
 
     # Normalize disparity for visualization and processing
     disparity_normalized = cv2.normalize(disparity, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
 
-    # Initial mask creation based on disparity threshold
+    # Segment the image based on disparity
     _, initial_mask = cv2.threshold(disparity_normalized, 0.3, 1.0, cv2.THRESH_BINARY)
-    initial_mask = (initial_mask * 255).astype(np.uint8)
 
     # Apply connected components to refine the mask
-    num_labels, labels = cv2.connectedComponents(initial_mask)
+    num_labels, labels = cv2.connectedComponents(initial_mask.astype(np.uint8))
     refined_mask = np.zeros_like(initial_mask, dtype=np.float32)
 
     # Filter small regions to refine the subject mask
@@ -81,27 +84,28 @@ def create_portrait_mode(image1, image2, blur_intensity=31, block_size=5, max_di
     refined_mask = cv2.morphologyEx(refined_mask, cv2.MORPH_OPEN, kernel)
 
     # Resize mask to original image size
-    refined_mask = cv2.resize(refined_mask, (image1.shape[1], image1.shape[0]), interpolation=cv2.INTER_NEAREST)
+    refined_mask = cv2.resize(refined_mask, (image1.shape[1], image1.shape[0]), interpolation=cv2.INTER_LINEAR)
+    refined_mask = refined_mask.astype(np.float32)
 
     # Apply blurring to the background
     blurred_image = cv2.GaussianBlur(image1, (blur_intensity, blur_intensity), 0)
 
     # Combine layers
-    portrait_image = refined_mask * image1 + (1 - refined_mask) * blurred_image
+    portrait_image = (refined_mask[..., np.newaxis] * image1 + (1 - refined_mask[..., np.newaxis]) * blurred_image)
 
     # Display results
     plt.figure(figsize=(15, 10))
     plt.subplot(1, 3, 1)
     plt.title("Disparity Map")
-    plt.imshow(disparity_normalized, cmap='gray')
+    plt.imshow(disparity_normalized)
 
     plt.subplot(1, 3, 2)
-    plt.title("Refined Mask")
+    plt.title("Mask")
     plt.imshow(refined_mask, cmap='gray')
 
     plt.subplot(1, 3, 3)
     plt.title("Portrait Effect")
-    plt.imshow(portrait_image, cmap='gray')
+    plt.imshow(portrait_image)
 
     plt.show()
 
@@ -130,11 +134,10 @@ def main():
     left_image_path = 'images/view1.png'
     right_image_path = 'images/view5.png'
 
-    disp_map = 'images/disp1.png'
     image1 = load_image(left_image_path)
     image2 = load_image(right_image_path)
     
-    create_portrait_mode(image1, image2, precomputed=True, disparity_map=disp_map)
+    create_portrait_mode(image1, image2)
 
 if __name__ == "__main__":
     main()
