@@ -115,7 +115,7 @@ def load_image(image_file):
     Returns:
         Preprocessed grayscale image.
     """
-    # Load image with cv2.IMREAD_UNCHANGED to retain all channels
+    # Load image
     image = cv2.imread(image_file, cv2.IMREAD_UNCHANGED)
 
     # If the image has four channels (e.g., RGBA), convert to RGB
@@ -127,13 +127,9 @@ def load_image(image_file):
     return img_as_float32(image)
 
 def main():
-    # Replace these with the actual file paths to your stereo images
-    #left_image_path = 'images/png_stereo_1.png'
-    #left_image_path = 'images/robot_left.png'
     left_image_path = 'images/view1.png'
-    #right_image_path = 'images/png_stereo_2.png'
-    #right_image_path = 'images/robot_right.png'
     right_image_path = 'images/view5.png'
+
     disp_map = 'images/disp1.png'
     image1 = load_image(left_image_path)
     image2 = load_image(right_image_path)
