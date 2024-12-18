@@ -14,14 +14,13 @@ def load_depth_model():
     print("Depth model loaded.")
     return model
 
-
 # Predict the depth map using the model
 def predict_depth(model, image):
     depth = model(image)
-    depth_map = depth.prediction[0]  # Directly use the NumPy array output
+    depth_map = depth.prediction[0]
     return depth_map
 
-# Preprocess the input image?
+# Preprocess the input image
 def preprocess_image(image_path):
     image = diffusers.utils.load_image(image_path)
     return image
@@ -54,10 +53,7 @@ def combine_foreground_background(image, mask):
     """
     Combine the sharp foreground and blurred background with a smooth transition.
     """
-    # Feather the mask to create a smooth transition
-    blurred_mask = cv2.GaussianBlur(mask, (21, 21), 0)  # Feathering the mask edges
-    
-    # Normalize the blurred mask to range [0, 1] for alpha blending
+    blurred_mask = cv2.GaussianBlur(mask, (21, 21), 0) 
     alpha = blurred_mask.astype(np.float32) / 255.0
     
     # Sharpen the foreground
@@ -70,7 +66,7 @@ def combine_foreground_background(image, mask):
     foreground = sharpened_foreground.astype(np.float32)
     blurred_background = cv2.GaussianBlur(image, (151, 151), 0).astype(np.float32)
     
-    # Perform alpha blending: Combine foreground and background smoothly
+    # Combine foreground and background
     combined_image = (foreground * alpha[..., None] + blurred_background * (1 - alpha[..., None])).astype(np.uint8)
     
     return combined_image
@@ -135,12 +131,11 @@ def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_o
 
 # Process an entire folder of images
 def process_image_folder(input_folder, output_folder):
-    # Ensure output folder exists
+
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
         print(f"Created output folder: {output_folder}")
 
-    # Get all image paths in the input folder
     image_files = [f for f in os.listdir(input_folder) if f.endswith(('.jpeg', '.jpg', '.png'))]
 
     print(f"Found {len(image_files)} images in {input_folder}. Processing...")
@@ -161,16 +156,15 @@ def process_image_folder(input_folder, output_folder):
 
         try:
             print(f"Processing image {i+1}/{len(image_files)}: {image_file}")
-            
-            # Call the apply_portrait_mode function with all paths
+
             apply_portrait_mode(input_image_path, portrait_output_path, depth_output_path, mask_output_path)
 
             print(f"Saved outputs for {image_file} to {image_output_folder}")
         except Exception as e:
             print(f"Error processing {image_file}: {e}")
 
-# Example usage
-input_folder = "marigold_dataset"  # Replace with your input folder path
-output_folder = "marigold_outputs"  # Replace with your output folder path
+
+input_folder = "marigold_dataset"
+output_folder = "marigold_outputs" 
 
 process_image_folder(input_folder, output_folder)

@@ -44,7 +44,7 @@ def generate_foreground_mask(depth_map, threshold):
     mask = (depth_map < threshold).astype(np.uint8) * 255
     return mask
 
-# Refine the mask with Gaussian blur and morphological operations
+# Refine the mask
 def refine_mask(mask):
     # Smooth mask edges using Gaussian blur
     blurred_mask = cv2.GaussianBlur(mask, (15, 15), 0)
@@ -55,12 +55,12 @@ def refine_mask(mask):
     
     return refined_mask
 
-# Combine depth mask and YOLO bounding box for sharp and blurred regions
+# Combine depth mask and YOLO box 
 def combine_masks(mask, yolo_bbox, image_shape):
-    # Create an empty mask with the same size as the original image
+    # Create an empty mask that's the same size as the original image
     combined_mask = np.zeros(image_shape[:2], dtype=np.uint8)
 
-    # Add YOLO bounding box as a sharp region
+    # Add YOLO bounding box
     x1, y1, x2, y2 = yolo_bbox
     combined_mask[y1:y2, x1:x2] = 255
 
@@ -71,19 +71,18 @@ def combine_masks(mask, yolo_bbox, image_shape):
     combined_mask = cv2.GaussianBlur(combined_mask, (31, 31), 0)
     return combined_mask
 
-# Combine sharp foreground and blurred background
+# Combine foreground and background
 def combine_sharp_and_blurred(image, mask, blur_strength=151):
     blurred_background = cv2.GaussianBlur(image, (blur_strength, blur_strength), 0)
     mask_3d = np.stack([mask / 255.0] * 3, axis=-1)
 
-    # Sharp foreground
     sharp_foreground = image * mask_3d
     blurred_only = blurred_background * (1 - mask_3d)
 
     combined_image = sharp_foreground + blurred_only
     return combined_image.astype(np.uint8)
 
-# Visualize a mask for debugging
+# mask visualization
 def visualize_mask(mask, output_path="mask_visualization.png"):
     plt.imshow(mask, cmap="gray")
     plt.title("Mask Visualization")
@@ -92,7 +91,7 @@ def visualize_mask(mask, output_path="mask_visualization.png"):
     plt.close()
     print(f"Mask visualization saved to {output_path}")
 
-# Visualize the depth map for debugging or visualization purposes
+# Depth map visualization
 def visualize_depth_map(depth_map, output_path="depth_map_visualization.png"):
     plt.figure(figsize=(8, 6))
     plt.imshow(depth_map, cmap="plasma")
@@ -102,14 +101,8 @@ def visualize_depth_map(depth_map, output_path="depth_map_visualization.png"):
     plt.close()
     print(f"Depth map visualization saved to {output_path}")
 
+# Draws a green bounding box on the image and saves the result
 def draw_green_box(image_path, bbox, output_path):
-    """
-    Draws a green bounding box on the image and saves the result.
-    Args:
-        image_path (str): Path to the input image.
-        bbox (tuple): Bounding box coordinates (x1, y1, x2, y2).
-        output_path (str): Path to save the output image.
-    """
     # Load the original image
     image = cv2.imread(image_path)
     if image is None:
@@ -118,15 +111,15 @@ def draw_green_box(image_path, bbox, output_path):
     # Extract bounding box coordinates
     x1, y1, x2, y2 = bbox
 
-    # Draw the green box (BGR: (0, 255, 0))
-    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)  # Thickness = 3
+    # Draw the green box
+    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
 
     # Save the image with the green box
     cv2.imwrite(output_path, image)
     print(f"Green box image saved to {output_path}")
 
 def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_output_path, box_output_path, depth_threshold, allowed_classes):
-    # Load models
+    # MODELS
     yolo_model = load_yolo_model()
     depth_model = load_depth_model()
 
@@ -146,9 +139,10 @@ def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_o
     # Filter by allowed classes
     detections = detections[detections['name'].isin(allowed_classes)]
 
+    # If no object is detected
     if detections.empty:
         print("No allowed objects detected. Applying Marigold mask to the entire image.")
-        # Apply global marigold mask
+        # Apply marigold mask
         foreground_mask = generate_foreground_mask(depth_map_resized, depth_threshold)
         refined_mask = refine_mask(foreground_mask)
         visualize_mask(refined_mask, mask_output_path)
@@ -179,10 +173,10 @@ def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_o
             # Combine YOLO bounding box with depth mask for this object
             obj_mask = combine_masks(refined_mask, (x1, y1, x2, y2), original_image.shape)
 
-            # Add this object's mask to the accumulated mask (logical OR)
+            # Merge this object's mask to the accumulated mask 
             accumulated_mask = cv2.bitwise_or(accumulated_mask, obj_mask)
 
-            # Draw green box if not already done (optional, you can draw for each object if desired)
+            # Draw green box if not already done
             if not box_drawn:
                 draw_green_box(image_path, (x1, y1, x2, y2), box_output_path)
                 box_drawn = True
@@ -197,7 +191,7 @@ def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_o
         cv2.imwrite(output_image_path, combined_result)
         print(f"Saved: Depth Map -> {depth_output_path},\nMask -> {mask_output_path},\nPortrait -> {output_image_path}")
     else:
-        # No objects met the depth threshold; apply Marigold mask globally
+        # No objects met the depth threshold; apply Marigold mask
         print("No allowed objects met the depth threshold. Applying Marigold mask to the entire image.")
         foreground_mask = generate_foreground_mask(depth_map_resized, depth_threshold)
         refined_mask = refine_mask(foreground_mask)
@@ -208,13 +202,12 @@ def apply_portrait_mode(image_path, output_image_path, depth_output_path, mask_o
 
 
 def process_image_folder(input_folder, output_folder, allowed_classes, depth_threshold):
-    # Ensure output folder exists
+
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
         print(f"Created output folder: {output_folder}")
 
-    # Get all image paths in the input folder
-    image_files = [f for f in os.listdir(input_folder) if f.endswith(('.jpeg', '.jpg', '.png'))]
+    image_files = [f for f in os.listdir(input_folder) if f.endswith(('.jpeg'))]
 
     print(f"Found {len(image_files)} images in {input_folder}. Processing...")
 
@@ -248,10 +241,8 @@ def process_image_folder(input_folder, output_folder, allowed_classes, depth_thr
         except Exception as e:
             print(f"Error processing {image_file}: {e}")
 
-
-# Example usage
-input_folder = "marigold_dataset"  # Replace with your input folder path
-output_folder = "yolo_outputs"     # Replace with your output folder path
+input_folder = "marigold_dataset" 
+output_folder = "yolo_outputs"  
 allowed_classes = ["person", "cat"]
 
 process_image_folder(input_folder, output_folder, allowed_classes=allowed_classes, depth_threshold=0.5)
